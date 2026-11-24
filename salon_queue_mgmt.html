@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crown &amp; Blade — Salon Queue Management</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Gujarati:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --charcoal: #1F2937;
+      --charcoal-dark: #111827;
+      --gold: #766334;
+      --gold-light: #F3C64F;
+    }
+    body {
+      font-family: 'Inter', 'Noto Sans Gujarati', system-ui, -apple-system, sans-serif;
+      background-color: #111827;
+      color: #F9FAFB;
+    }
+    @keyframes goldPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(212, 160, 23, 0.55); transform: scale(1); }
+      50% { box-shadow: 0 0 0 18px rgba(212, 160, 23, 0); transform: scale(1.015); }
+    }
+    .animate-gold-pulse {
+      animation: goldPulse 2s infinite ease-in-out;
+    }
+    @keyframes tvFlash {
+      0%, 100% { background-color: rgba(212, 160, 23, 0.18); border-color: #D4A017; }
+      50% { background-color: rgba(212, 160, 23, 0.48); border-color: #FDE047; }
+    }
+    .animate-tv-flash {
+      animation: tvFlash 1s ease-in-out 4;
+    }
+    .tap-target {
+      min-height: 44px;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #111827; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 9999px; }
+  </style>
+</head>
+<body class="min-h-screen bg-[#111827] text-gray-100 flex flex-col">
+
+  <!-- Top Navigation Bar -->
+  <header class="sticky top-0 z-40 bg-[#1F2937]/95 backdrop-blur border-b border-gray-700/80">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2">
+      <button type="button" id="brandHomeBtn" class="flex items-center gap-2.5 text-left tap-target focus:outline-none">
+        <div class="w-9 h-9 rounded-xl bg-[#D4A017] text-[#111827] flex items-center justify-center font-extrabold text-lg shadow-sm shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M6 18L18 6M14 4l6 6M4 14l6 6" />
+          </svg>
+        </div>
+        <div class="leading-tight">
+          <div class="font-bold text-sm sm:text-base text-white tracking-tight" data-i18n="salonName">Crown &amp; Blade Salon</div>
+          <div class="text-[11px] text-[#D4A017] font-medium" data-i18n="salonSubtitle">Live Queue System</div>
+        </div>
+      </button>
+
+      <!-- Desktop Nav Pills -->
+      <nav id="desktopNav" class="hidden lg:flex items-center gap-1 bg-[#111827] p-1 rounded-xl border border-gray-700/70">
+        <!-- Rendered by JS -->
+      </nav>
+
+      <!-- Right Controls: Language Toggle + Mobile Menu -->
+      <div class="flex items-center gap-2">
+        <button type="button" id="langToggleBtn" class="tap-target px-3 py-1.5 rounded-xl bg-[#111827] border border-gray-600 hover:border-[#D4A017] text-xs sm:text-sm font-semibold text-gray-100 flex items-center gap-1.5 transition">
+          <span class="text-[#D4A017]">🌐</span>
+          <span id="langToggleLabel">ગુજરાતી</span>
+        </button>
+        <button type="button" id="mobileMenuBtn" class="lg:hidden tap-target px-2.5 py-2 rounded-xl bg-[#111827] border border-gray-600 text-gray-200 hover:border-[#D4A017]" aria-label="Menu">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile / Tablet Screen Switcher Drawer -->
+    <div id="mobileNavDrawer" class="hidden lg:hidden border-t border-gray-700/80 bg-[#1F2937] px-3 py-2.5">
+      <div id="mobileNavGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main id="appMain" class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-5 sm:py-7">
+    <!-- Active screen rendered here -->
+  </main>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-96 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Modal Container -->
+  <div id="modalBackdrop" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="modalContent" class="bg-[#1F2937] border border-gray-700 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl">
+      <!-- Modal injected by JS -->
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // =========================================================================
+      // 1. TRANSLATIONS (EN / GU) — All UI labels centralized here
+      // =========================================================================
+      const I18N = {
+        en: {
+          salonName: 'Crown & Blade Salon',
+          salonSubtitle: 'Live Queue System',
+          navHome: 'Home',
+          navJoin: 'Join Queue',
+          navStatus: 'My Status',
+          navReception: 'Reception',
+          navBarber: 'Barber View',
+          navDisplay: 'TV Display',
+          navAdmin: 'Owner Settings',
+
+          openBadge: 'Open · Closes 9:00 PM',
+          closedBadge: 'Online Queue Closed · Walk-ins Only',
+          peopleWaiting: 'people waiting',
+          personWaiting: 'person waiting',
+          aboutMin: 'about {m} min',
+          noWaitWalkIn: 'No one waiting — walk right in!',
+          joinQueueBtn: 'Join Queue',
+          onlineClosedMsg: 'Online joining is currently closed. Please visit reception for walk-in availability.',
+          barbersLabel: 'Barbers Today',
+          statusBusy: 'Busy',
+          statusFree: 'Free',
+          statusOnBreak: 'On break',
+          statusOffDuty: 'Off duty',
+          statusCalled: 'Called',
+          statusInChair: 'In chair',
+          statusWaiting: 'Waiting',
+          statusDone: 'Done',
+          statusCancelled: 'Cancelled',
+          statusNoShow: 'No-show',
+
+          joinTitle: 'Join the Queue',
+          joinSub: 'Pick your services and preferred barber. We will save your spot.',
+          fullName: 'Full Name',
+          fullNamePlaceholder: 'e.g., Aarav Patel',
+          phoneLabel: 'Phone Number (10 digits)',
+          phonePlaceholder: 'e.g., 9876543210',
+          phoneError: 'Please enter a valid 10-digit mobile number.',
+          nameError: 'Please enter your name.',
+          serviceError: 'Please select at least 1 service.',
+          maxServicesToast: 'You can select up to 3 services at once.',
+          selectServices: 'Select Services (max 3)',
+          minLabel: 'min',
+          pickBarber: 'Choose Your Barber',
+          anyBarber: 'Any Barber (Fastest)',
+          anyBarberSub: 'Next available chair',
+          barberOnBreakWarn: '{name} is currently on break — wait may be longer.',
+          summaryTotal: 'Total {min} min · ₹{price}',
+          summaryWait: 'Expected wait ~{wait} min',
+          confirmJoinBtn: 'Confirm & Get Token',
+          duplicatePhoneToast: 'Phone already in queue — showing your active spot {token}.',
+
+          myStatusTitle: 'Live Queue Status',
+          selectActiveToken: 'Viewing Token:',
+          noActiveTokenTitle: 'No Active Token Selected',
+          noActiveTokenDesc: 'Join the queue to get a live token and track your turn in real time.',
+          positionInLine: '{pos} in line',
+          estWaitLabel: 'Estimated Wait',
+          startComingBanner: 'Start coming to the salon! You are 2nd in line.',
+          yourTurnTitle: "It's your turn! Go to {barber}",
+          yourTurnSub: 'Please head to the chair right away.',
+          inChairTitle: 'You are in the chair with {barber}',
+          inChairSub: 'Enjoy your service!',
+          servicesChosen: 'Services',
+          preferredBarber: 'Barber',
+          cancelSpotBtn: 'Cancel My Spot',
+          cancelConfirmTitle: 'Cancel your queue spot?',
+          cancelConfirmDesc: 'You will lose token {token} and need to rejoin at the end of the line.',
+          keepSpotBtn: 'Keep My Spot',
+          confirmCancelBtn: 'Yes, Cancel Spot',
+          spotCancelledToast: 'Token {token} has been cancelled.',
+          tokenEndedTitle: 'Token {token} — {status}',
+          tokenEndedDesc: 'This token is no longer active in the queue.',
+          rejoinBtn: 'Join Queue Again',
+
+          receptionTitle: 'Reception Dashboard',
+          addWalkInBtn: '+ Add Walk-in',
+          resetDemoBtn: 'Reset Demo',
+          barberChairs: 'Barber Chairs',
+          waitingListTitle: 'Waiting List',
+          callNextBtn: 'Call Next',
+          noEligibleWaiting: 'No waiting customer for {name}',
+          barberBusyNote: 'Finish current customer first',
+          timeLeftLabel: '{m} min left',
+          overtimeLabel: 'Running +{m} min over',
+          waitedLabel: 'Waited {m}m',
+          longWaitBadge: '> 60m wait',
+          markNoShowBtn: 'No-show',
+          cancelBtn: 'Cancel',
+          walkInModalTitle: 'Add Walk-in Customer',
+          walkInBadge: 'Walk-in',
+          addWalkInConfirm: 'Add to Queue',
+          noShowSectionTitle: 'Recent No-shows (Re-add at End)',
+          readdEndBtn: 'Re-add at End',
+          readdedToast: '{name} re-added at the end as {token}.',
+
+          barberViewTitle: 'Barber Console',
+          currentCustomer: 'Current Customer',
+          noCurrentCustomer: 'Chair is free',
+          tapCallNextHint: 'Waiting for reception to call next customer, or start when called.',
+          timerSinceStart: 'Chair timer',
+          startServiceBtn: 'Start',
+          doneServiceBtn: 'Done',
+          nextForYou: 'Next for you',
+          noNextForYou: 'No one waiting for you right now.',
+          breakToggleLabel: 'Availability',
+          availableState: 'Available',
+          onBreakState: 'On Break',
+
+          tvTitle: 'Waiting Area Display',
+          tvNowServing: 'Now Serving',
+          tvUpNext: 'Up Next (Top 5)',
+          tvNowPrefix: 'Now:',
+          tvFreeChair: 'Chair Free',
+          tvSoundOn: 'Chime On',
+          tvSoundOff: 'Chime Muted',
+          tvCalledAlert: 'Now Calling {token} → {barber}',
+
+          adminTitle: 'Owner Settings',
+          statsServed: 'Customers Served',
+          statsAvgWait: 'Avg Wait Time',
+          statsNoShows: 'No-Shows Today',
+          onlineQueueControl: 'Online Queue Joining',
+          onlineQueueDesc: 'Allow customers to join from their phone. Walk-ins remain available at reception.',
+          queueOpenLabel: 'Open',
+          queueClosedLabel: 'Closed',
+          barbersOnDutyTitle: 'Barbers on Duty Today',
+          servicesMenuTitle: 'Services Menu',
+          serviceActive: 'Active',
+          serviceHidden: 'Hidden',
+          demoResetToast: 'Demo queue state has been reset.'
+        },
+        gu: {
+          salonName: 'ક્રાઉન એન્ડ બ્લેડ સલૂન',
+          salonSubtitle: 'લાઇવ કતાર સિસ્ટમ',
+          navHome: 'હોમ',
+          navJoin: 'કતારમાં જોડાઓ',
+          navStatus: 'મારી સ્થિતિ',
+          navReception: 'રિસેપ્શન',
+          navBarber: 'બાર્બર વ્યૂ',
+          navDisplay: 'ટીવી ડિસ્પ્લે',
+          navAdmin: 'માલિક સેટિંગ્સ',
+
+          openBadge: 'ખુલ્લું છે · રાત્રે 9:00 વાગ્યે બંધ',
+          closedBadge: 'ઓનલાઈન કતાર બંધ · માત્ર વોક-ઈન',
+          peopleWaiting: 'લોકો રાહ જુએ છે',
+          personWaiting: 'વ્યક્તિ રાહ જુએ છે',
+          aboutMin: 'અંદાજે {m} મિનિટ',
+          noWaitWalkIn: 'કોઈ રાહ જોતું નથી — સીધા અંદર આવો!',
+          joinQueueBtn: 'કતારમાં જોડાઓ',
+          onlineClosedMsg: 'હાલમાં ઓનલાઈન જોડાવાનું બંધ છે. વોક-ઈન માટે રિસેપ્શન પર મળો.',
+          barbersLabel: 'આજના બાર્બર',
+          statusBusy: 'વ્યસ્ત',
+          statusFree: 'ફ્રી',
+          statusOnBreak: 'બ્રેક પર',
+          statusOffDuty: 'રજા પર',
+          statusCalled: 'બોલાવ્યા',
+          statusInChair: 'ખુરશી પર',
+          statusWaiting: 'રાહમાં',
+          statusDone: 'પૂર્ણ',
+          statusCancelled: 'રદ',
+          statusNoShow: 'ગેરહાજર',
+
+          joinTitle: 'કતારમાં જોડાઓ',
+          joinSub: 'તમારી સેવાઓ અને પસંદગીના બાર્બર પસંદ કરો.',
+          fullName: 'પૂરું નામ',
+          fullNamePlaceholder: 'દા.ત., આરવ પટેલ',
+          phoneLabel: 'મોબાઈલ નંબર (10 અંક)',
+          phonePlaceholder: 'દા.ત., 9876543210',
+          phoneError: 'કૃપા કરીને માન્ય 10-અંકનો મોબાઈલ નંબર દાખલ કરો.',
+          nameError: 'કૃપા કરીને તમારું નામ લખો.',
+          serviceError: 'ઓછામાં ઓછી 1 સેવા પસંદ કરો.',
+          maxServicesToast: 'તમે એકસાથે વધુમાં વધુ 3 સેવાઓ પસંદ કરી શકો છો.',
+          selectServices: 'સેવાઓ પસંદ કરો (વધુમાં વધુ 3)',
+          minLabel: 'મિનિટ',
+          pickBarber: 'બાર્બર પસંદ કરો',
+          anyBarber: 'કોઈ પણ બાર્બર (સૌથી ઝડપી)',
+          anyBarberSub: 'આગલી ખાલી ખુરશી',
+          barberOnBreakWarn: '{name} હાલમાં બ્રેક પર છે — વધુ સમય લાગી શકે છે.',
+          summaryTotal: 'કુલ {min} મિનિટ · ₹{price}',
+          summaryWait: 'અંદાજિત રાહ ~{wait} મિનિટ',
+          confirmJoinBtn: 'કન્ફર્મ કરો અને ટોકન લો',
+          duplicatePhoneToast: 'આ નંબર પહેલેથી કતારમાં છે — તમારો ટોકન {token} બતાવ્યો છે.',
+
+          myStatusTitle: 'લાઇવ કતાર સ્થિતિ',
+          selectActiveToken: 'ટોકન જુઓ:',
+          noActiveTokenTitle: 'કોઈ સક્રિય ટોકન નથી',
+          noActiveTokenDesc: 'લાઇવ ટોકન મેળવવા અને તમારો વારો જોવા માટે કતારમાં જોડાઓ.',
+          positionInLine: 'લાઇનમાં {pos} નંબર',
+          estWaitLabel: 'અંદાજિત રાહ',
+          startComingBanner: 'સલૂન આવવાનું શરૂ કરો! તમારો નંબર 2જો છે.',
+          yourTurnTitle: 'તમારો વારો આવી ગયો છે! {barber} પાસે જાઓ',
+          yourTurnSub: 'કૃપા કરીને તરત જ ખુરશી પર આવો.',
+          inChairTitle: 'તમે {barber} ની ખુરશી પર છો',
+          inChairSub: 'તમારી સેવાનો આનંદ લો!',
+          servicesChosen: 'સેવાઓ',
+          preferredBarber: 'બાર્બર',
+          cancelSpotBtn: 'મારો નંબર રદ કરો',
+          cancelConfirmTitle: 'તમારો કતાર નંબર રદ કરવો છે?',
+          cancelConfirmDesc: 'તમે ટોકન {token} ગુમાવશો અને ફરીથી લાઇનના અંતે જોડાવું પડશે.',
+          keepSpotBtn: 'નંબર રાખો',
+          confirmCancelBtn: 'હા, રદ કરો',
+          spotCancelledToast: 'ટોકન {token} રદ કરવામાં આવ્યું છે.',
+          tokenEndedTitle: 'ટોકન {token} — {status}',
+          tokenEndedDesc: 'આ ટોકન હવે કતારમાં સક્રિય નથી.',
+          rejoinBtn: 'ફરીથી કતારમાં જોડાઓ',
+
+          receptionTitle: 'રિસેપ્શન ડેશબોર્ડ',
+          addWalkInBtn: '+ વોક-ઈન ઉમેરો',
+          resetDemoBtn: 'ડેમો રીસેટ',
+          barberChairs: 'બાર્બર ખુરશીઓ',
+          waitingListTitle: 'રાહ જોનારાઓની યાદી',
+          callNextBtn: 'આગળનાને બોલાવો',
+          noEligibleWaiting: '{name} માટે કોઈ રાહ જોતું નથી',
+          barberBusyNote: 'પહેલા હાલના ગ્રાહકનું કામ પૂરું કરો',
+          timeLeftLabel: '{m} મિનિટ બાકી',
+          overtimeLabel: '+{m} મિનિટ વધુ',
+          waitedLabel: '{m} મિનિટથી રાહ',
+          longWaitBadge: '> 60 મિનિટ રાહ',
+          markNoShowBtn: 'ગેરહાજર',
+          cancelBtn: 'રદ',
+          walkInModalTitle: 'વોક-ઈન ગ્રાહક ઉમેરો',
+          walkInBadge: 'વોક-ઈન',
+          addWalkInConfirm: 'કતારમાં ઉમેરો',
+          noShowSectionTitle: 'તાજેતરના ગેરહાજર (અંતે ફરી ઉમેરો)',
+          readdEndBtn: 'અંતે ફરી ઉમેરો',
+          readdedToast: '{name} ને {token} તરીકે અંતે ફરી ઉમેરવામાં આવ્યા.',
+
+          barberViewTitle: 'બાર્બર કન્સોલ',
+          currentCustomer: 'હાલના ગ્રાહક',
+          noCurrentCustomer: 'ખુરશી ખાલી છે',
+          tapCallNextHint: 'રિસેપ્શન દ્વારા ગ્રાહક બોલાવવાની રાહ જુઓ.',
+          timerSinceStart: 'ખુરશીનો સમય',
+          startServiceBtn: 'શરૂ કરો',
+          doneServiceBtn: 'પૂર્ણ થયું',
+          nextForYou: 'તમારા માટે આગળ',
+          noNextForYou: 'હાલમાં તમારા માટે કોઈ રાહ જોતું નથી.',
+          breakToggleLabel: 'ઉપલબ્ધતા',
+          availableState: 'ઉપલબ્ધ',
+          onBreakState: 'બ્રેક પર',
+
+          tvTitle: 'વેઇટિંગ એરિયા ટીવી',
+          tvNowServing: 'હાલમાં સેવા ચાલુ',
+          tvUpNext: 'આગળના 5 ટોકન',
+          tvNowPrefix: 'હાલ:',
+          tvFreeChair: 'ખુરશી ખાલી',
+          tvSoundOn: 'ચાઇમ ચાલુ',
+          tvSoundOff: 'ચાઇમ બંધ',
+          tvCalledAlert: 'હવે બોલાવીએ છીએ {token} → {barber}',
+
+          adminTitle: 'માલિક સેટિંગ્સ',
+          statsServed: 'સેવા આપેલ ગ્રાહકો',
+          statsAvgWait: 'સરેરાશ રાહ સમય',
+          statsNoShows: 'આજના ગેરહાજર',
+          onlineQueueControl: 'ઓનલાઈન કતાર જોડાણ',
+          onlineQueueDesc: 'ગ્રાહકોને ફોનથી જોડાવા દો. રિસેપ્શન પર વોક-ઈન હંમેશા ચાલુ રહેશે.',
+          queueOpenLabel: 'ખુલ્લું',
+          queueClosedLabel: 'બંધ',
+          barbersOnDutyTitle: 'આજે ફરજ પરના બાર્બર',
+          servicesMenuTitle: 'સેવાઓની યાદી',
+          serviceActive: 'ચાલુ',
+          serviceHidden: 'બંધ',
+          demoResetToast: 'ડેમો કતાર સ્થિતિ રીસેટ થઈ ગઈ છે.'
+        }
+      };
+
+      // =========================================================================
+      // 2. INITIAL STATE & STORAGE SYNC
+      // =========================================================================
+      const STORAGE_KEY = 'crown_blade_salon_queue_v1';
+
+      function createInitialState() {
+        const now = Date.now();
+        return {
+          lang: 'en',
+          activeScreen: 'home',
+          selectedStatusTokenId: 'S-14',
+          selectedBarberId: 'ravi',
+          nextTokenNumber: 18,
+          onlineQueueOpen: true,
+          closingTime: '9:00 PM',
+          soundEnabled: true,
+          lastCalledFlash: null, // { token, barberId, at }
+          stats: {
+            served: 14,
+            totalWaitMins: 350,
+            noShows: 1
+          },
+          services: [
+            { id: 'haircut', nameEn: 'Haircut', nameGu: 'હેરકટ', minutes: 30, price: 150, enabled: true },
+            { id: 'beard', nameEn: 'Beard Trim', nameGu: 'દાઢી ટ્રિમ', minutes: 15, price: 80, enabled: true },
+            { id: 'spa', nameEn: 'Hair Spa', nameGu: 'હેર સ્પા', minutes: 45, price: 400, enabled: true },
+            { id: 'shave', nameEn: 'Shave', nameGu: 'શેવ', minutes: 15, price: 70, enabled: true },
+            { id: 'massage', nameEn: 'Head Massage', nameGu: 'માથાની માલિશ', minutes: 20, price: 120, enabled: true },
+            { id: 'facial', nameEn: 'Facial', nameGu: 'ફેશિયલ', minutes: 40, price: 350, enabled: true }
+          ],
+          barbers: [
+            { id: 'ravi', name: 'Ravi', nameGu: 'રવિ', onDuty: true, onBreak: false, currentTokenId: 'S-10', chairStartedAt: now - 12 * 60000 },
+            { id: 'amit', name: 'Amit', nameGu: 'અમિત', onDuty: true, onBreak: false, currentTokenId: 'S-11', chairStartedAt: now - 5 * 60000 },
+            { id: 'imran', name: 'Imran', nameGu: 'ઇમરાન', onDuty: true, onBreak: true, currentTokenId: null, chairStartedAt: null }
+          ],
+          queue: [
+            { id: 'S-10', name: 'Rohan Mehta', phone: '9825011101', services: ['haircut', 'beard'], preferredBarber: 'ravi', status: 'In chair', assignedBarber: 'ravi', createdAt: now - 52 * 60000, startedAt: now - 12 * 60000, isWalkIn: false },
+            { id: 'S-11', name: 'Devansh Shah', phone: '9825011102', services: ['haircut'], preferredBarber: 'amit', status: 'In chair', assignedBarber: 'amit', createdAt: now - 35 * 60000, startedAt: now - 5 * 60000, isWalkIn: true },
+            { id: 'S-12', name: 'Kunal Joshi', phone: '9825011103', services: ['spa'], preferredBarber: 'ravi', status: 'Waiting', assignedBarber: null, createdAt: now - 65 * 60000, startedAt: null, isWalkIn: false },
+            { id: 'S-13', name: 'Pratik Desai', phone: '9825011104', services: ['haircut', 'shave'], preferredBarber: 'any', status: 'Waiting', assignedBarber: null, createdAt: now - 38 * 60000, startedAt: null, isWalkIn: false },
+            { id: 'S-14', name: 'Nikhil Patel', phone: '9825011105', services: ['haircut', 'beard'], preferredBarber: 'any', status: 'Waiting', assignedBarber: null, createdAt: now - 28 * 60000, startedAt: null, isWalkIn: false },
+            { id: 'S-15', name: 'Sagar Parmar', phone: '9825011106', services: ['massage'], preferredBarber: 'amit', status: 'Waiting', assignedBarber: null, createdAt: now - 20 * 60000, startedAt: null, isWalkIn: true },
+            { id: 'S-16', name: 'Harsh Modi', phone: '9825011107', services: ['haircut'], preferredBarber: 'any', status: 'Waiting', assignedBarber: null, createdAt: now - 12 * 60000, startedAt: null, isWalkIn: false },
+            { id: 'S-17', name: 'Yash Trivedi', phone: '9825011108', services: ['beard', 'facial'], preferredBarber: 'imran', status: 'Waiting', assignedBarber: null, createdAt: now - 6 * 60000, startedAt: null, isWalkIn: false }
+          ]
+        };
+      }
+
+      let state = loadState();
+      // Form transient state (for Join Queue)
+      let joinForm = {
+        name: '',
+        phone: '',
+        services: ['haircut'],
+        preferredBarber: 'any',
+        errors: {}
+      };
+
+      let channel = null;
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          channel = new BroadcastChannel('crown_blade_queue_sync');
+          channel.onmessage = function (ev) {
+            if (ev && ev.data && ev.data.type === 'STATE_UPDATE') {
+              state = ev.data.payload;
+              renderAll();
+            }
+          };
+        }
+      } catch (e) { /* Ignore in restricted environments */ }
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && Array.isArray(parsed.queue) && Array.isArray(parsed.barbers)) {
+              return parsed;
+            }
+          }
+        } catch (e) { /* Fallback to initial state */ }
+        return createInitialState();
+      }
+
+      function saveState(broadcast = true) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) { /* Ignore storage quota errors */ }
+        if (broadcast && channel) {
+          try {
+            channel.postMessage({ type: 'STATE_UPDATE', payload: state });
+          } catch (e) { /* Ignore */ }
+        }
+      }
+
+      // =========================================================================
+      // 3. QUEUE RULES ENGINE (Single Source of Truth)
+      // =========================================================================
+      function t(key, vars = {}) {
+        const dict = I18N[state.lang] || I18N.en;
+        let str = dict[key] !== undefined ? dict[key] : (I18N.en[key] || key);
+        Object.keys(vars).forEach(k => {
+          str = str.replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]);
+        });
+        return str;
+      }
+
+      function getServiceById(id) {
+        return state.services.find(s => s.id === id);
+      }
+
+      function getServiceName(svc) {
+        if (!svc) return '';
+        return state.lang === 'gu' ? svc.nameGu : svc.nameEn;
+      }
+
+      function getBarberById(id) {
+        return state.barbers.find(b => b.id === id);
+      }
+
+      function getBarberName(barber) {
+        if (!barber) return '';
+        return state.lang === 'gu' ? barber.nameGu : barber.name;
+      }
+
+      function getEntryTotals(entry) {
+        let minutes = 0;
+        let price = 0;
+        (entry.services || []).forEach(sid => {
+          const s = getServiceById(sid);
+          if (s) {
+            minutes += s.minutes;
+            price += s.price;
+          }
+        });
+        return { minutes, price };
+      }
+
+      function getWaitingQueue() {
+        return state.queue.filter(q => q.status === 'Waiting');
+      }
+
+      function getActiveWorkingBarbersCount() {
+        const count = state.barbers.filter(b => b.onDuty && !b.onBreak).length;
+        return Math.max(1, count);
+      }
+
+      function getEstimatedWaitForPosition(waitingIndex) {
+        const waiting = getWaitingQueue();
+        const slice = waitingIndex === -1 ? waiting : waiting.slice(0, waitingIndex);
+        let totalMins = 0;
+        slice.forEach(item => {
+          totalMins += getEntryTotals(item).minutes;
+        });
+        // Add remaining time of barbers currently in chair
+        state.barbers.forEach(b => {
+          if (b.onDuty && b.currentTokenId) {
+            const cur = state.queue.find(q => q.id === b.currentTokenId);
+            if (cur) {
+              const dur = getEntryTotals(cur).minutes;
+              const elapsed = b.chairStartedAt ? Math.floor((Date.now() - b.chairStartedAt) / 60000) : 0;
+              totalMins += Math.max(5, dur - elapsed);
+            }
+          }
+        });
+        const working = getActiveWorkingBarbersCount();
+        const est = Math.round(totalMins / working);
+        if (waitingIndex === 0 && slice.length === 0) return Math.min(10, est);
+        return est;
+      }
+
+      function getGlobalWaitSummary() {
+        const waiting = getWaitingQueue();
+        const est = getEstimatedWaitForPosition(-1);
+        return { count: waiting.length, estMinutes: waiting.length === 0 ? 0 : Math.max(5, est) };
+      }
+
+      function getNextForBarber(barberId) {
+        // Rule: Picks the earliest Waiting customer who chose barberId or 'any'.
+        // A customer who chose Ravi is never given to another barber.
+        return state.queue.find(q =>
+          q.status === 'Waiting' && (q.preferredBarber === barberId || q.preferredBarber === 'any')
+        ) || null;
+      }
+
+      function getOrdinal(n) {
+        if (state.lang === 'gu') return String(n);
+        const s = ['th', 'st', 'nd', 'rd'];
+        const v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+      }
+
+      function playChime() {
+        if (!state.soundEnabled) return;
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+          const ctx = new AudioCtx();
+          const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.001, ctx.currentTime + idx * 0.14);
+            gain.gain.exponentialRampToValueAtTime(0.14, ctx.currentTime + idx * 0.14 + 0.04);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.14 + 0.45);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + idx * 0.14);
+            osc.stop(ctx.currentTime + idx * 0.14 + 0.48);
+          });
+        } catch (e) { /* Ignore audio block */ }
+      }
+
+      // =========================================================================
+      // 4. MUTATIONS
+      // =========================================================================
+      function callNextForBarber(barberId) {
+        const barber = getBarberById(barberId);
+        if (!barber || !barber.onDuty || barber.onBreak || barber.currentTokenId) return;
+        const nextCustomer = getNextForBarber(barberId);
+        if (!nextCustomer) {
+          showToast(t('noEligibleWaiting', { name: getBarberName(barber) }), 'amber');
+          return;
+        }
+        nextCustomer.status = 'Called';
+        nextCustomer.assignedBarber = barberId;
+        nextCustomer.calledAt = Date.now();
+        barber.currentTokenId = nextCustomer.id;
+        barber.chairStartedAt = null;
+        state.lastCalledFlash = { token: nextCustomer.id, barberId, at: Date.now() };
+        playChime();
+        saveState();
+        showToast(t('tvCalledAlert', { token: nextCustomer.id, barber: getBarberName(barber) }), 'gold');
+        renderAll();
+      }
+
+      function startServiceForBarber(barberId) {
+        const barber = getBarberById(barberId);
+        if (!barber || !barber.currentTokenId) return;
+        const entry = state.queue.find(q => q.id === barber.currentTokenId);
+        if (!entry || entry.status !== 'Called') return;
+        entry.status = 'In chair';
+        entry.startedAt = Date.now();
+        barber.chairStartedAt = entry.startedAt;
+        saveState();
+        renderAll();
+      }
+
+      function doneServiceForBarber(barberId) {
+        const barber = getBarberById(barberId);
+        if (!barber || !barber.currentTokenId) return;
+        const entry = state.queue.find(q => q.id === barber.currentTokenId);
+        if (entry) {
+          const waited = Math.max(1, Math.round(((entry.startedAt || Date.now()) - entry.createdAt) / 60000));
+          entry.status = 'Done';
+          entry.doneAt = Date.now();
+          state.stats.served += 1;
+          state.stats.totalWaitMins += waited;
+        }
+        barber.currentTokenId = null;
+        barber.chairStartedAt = null;
+        saveState();
+        renderAll();
+      }
+
+      function markNoShow(tokenId) {
+        const entry = state.queue.find(q => q.id === tokenId);
+        if (!entry || entry.status !== 'Called') return;
+        const barber = getBarberById(entry.assignedBarber);
+        if (barber && barber.currentTokenId === tokenId) {
+          barber.currentTokenId = null;
+          barber.chairStartedAt = null;
+        }
+        entry.status = 'No-show';
+        state.stats.noShows += 1;
+        saveState();
+        renderAll();
+      }
+
+      function cancelToken(tokenId) {
+        const entry = state.queue.find(q => q.id === tokenId);
+        if (!entry || (entry.status !== 'Waiting' && entry.status !== 'Called')) return;
+        if (entry.assignedBarber) {
+          const barber = getBarberById(entry.assignedBarber);
+          if (barber && barber.currentTokenId === tokenId) {
+            barber.currentTokenId = null;
+            barber.chairStartedAt = null;
+          }
+        }
+        entry.status = 'Cancelled';
+        saveState();
+        showToast(t('spotCancelledToast', { token: tokenId }), 'info');
+        renderAll();
+      }
+
+      function readdNoShowAtEnd(tokenId) {
+        const oldEntry = state.queue.find(q => q.id === tokenId);
+        if (!oldEntry) return;
+        // Mark old entry archived so it doesn't show twice in re-add list
+        oldEntry.readded = true;
+        const newToken = 'S-' + state.nextTokenNumber;
+        state.nextTokenNumber += 1;
+        state.queue.push({
+          id: newToken,
+          name: oldEntry.name,
+          phone: oldEntry.phone,
+          services: [...oldEntry.services],
+          preferredBarber: oldEntry.preferredBarber,
+          status: 'Waiting',
+          assignedBarber: null,
+          createdAt: Date.now(),
+          startedAt: null,
+          isWalkIn: oldEntry.isWalkIn
+        });
+        saveState();
+        showToast(t('readdedToast', { name: oldEntry.name, token: newToken }), 'gold');
+        renderAll();
+      }
+
+      function addCustomerToQueue({ name, phone, services, preferredBarber, isWalkIn }) {
+        // One active spot per phone number
+        const cleanPhone = phone.replace(/\D/g, '');
+        const existing = state.queue.find(q =>
+          q.phone === cleanPhone && (q.status === 'Waiting' || q.status === 'Called' || q.status === 'In chair')
+        );
+        if (existing) {
+          state.selectedStatusTokenId = existing.id;
+          state.activeScreen = 'status';
+          saveState();
+          showToast(t('duplicatePhoneToast', { token: existing.id }), 'amber');
+          renderAll();
+          return existing.id;
+        }
+        const newToken = 'S-' + state.nextTokenNumber;
+        state.nextTokenNumber += 1;
+        state.queue.push({
+          id: newToken,
+          name: name.trim(),
+          phone: cleanPhone,
+          services: [...services],
+          preferredBarber: preferredBarber || 'any',
+          status: 'Waiting',
+          assignedBarber: null,
+          createdAt: Date.now(),
+          startedAt: null,
+          isWalkIn: Boolean(isWalkIn)
+        });
+        if (!isWalkIn) {
+          state.selectedStatusTokenId = newToken;
+          state.activeScreen = 'status';
+        }
+        saveState();
+        renderAll();
+        return newToken;
+      }
+
+      // =========================================================================
+      // 5. UI HELPERS (Toast & Modal)
+      // =========================================================================
+      function showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const el = document.createElement('div');
+        const colors = {
+          gold: 'bg-[#1F2937] border-[#D4A017] text-[#FDE047]',
+          amber: 'bg-[#1F2937] border-amber-500 text-amber-300',
+          info: 'bg-[#1F2937] border-gray-600 text-gray-100'
+        };
+        el.className = `pointer-events-auto px-4 py-3 rounded-xl border shadow-xl text-sm font-medium transition-all duration-300 ${colors[type] || colors.info}`;
+        el.textContent = message;
+        container.appendChild(el);
+        setTimeout(() => {
+          el.classList.add('opacity-0', 'translate-y-2');
+          setTimeout(() => el.remove(), 300);
+        }, 3400);
+      }
+
+      function openModal(html) {
+        const backdrop = document.getElementById('modalBackdrop');
+        const content = document.getElementById('modalContent');
+        content.innerHTML = html;
+        backdrop.classList.remove('hidden');
+      }
+
+      function closeModal() {
+        document.getElementById('modalBackdrop').classList.add('hidden');
+      }
+
+      document.getElementById('modalBackdrop').addEventListener('click', function (e) {
+        if (e.target === this) closeModal();
+      });
+
+      // =========================================================================
+      // 6. SCREEN RENDERERS
+      // =========================================================================
+      const SCREENS = [
+        { id: 'home', labelKey: 'navHome' },
+        { id: 'join', labelKey: 'navJoin' },
+        { id: 'status', labelKey: 'navStatus' },
+        { id: 'reception', labelKey: 'navReception' },
+        { id: 'barber', labelKey: 'navBarber' },
+        { id: 'display', labelKey: 'navDisplay' },
+        { id: 'admin', labelKey: 'navAdmin' }
+      ];
+
+      function renderNav() {
+        const desktopNav = document.getElementById('desktopNav');
+        const mobileGrid = document.getElementById('mobileNavGrid');
+        const langLabel = document.getElementById('langToggleLabel');
+        langLabel.textContent = state.lang === 'en' ? 'ગુજરાતી' : 'English';
+
+        const activeCount = state.queue.filter(q => q.status === 'Waiting' || q.status === 'Called').length;
+
+        desktopNav.innerHTML = SCREENS.map(s => {
+          const isActive = state.activeScreen === s.id;
+          const badge = s.id === 'reception' && activeCount > 0
+            ? `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] rounded-full bg-[#D4A017]/20 text-[#D4A017]">${activeCount}</span>`
+            : '';
+          return `<button type="button" data-nav="${s.id}" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center ${
+            isActive ? 'bg-[#D4A017] text-[#111827] shadow-sm' : 'text-gray-300 hover:text-white hover:bg-gray-800'
+          }">${t(s.labelKey)}${badge}</button>`;
+        }).join('');
+
+        mobileGrid.innerHTML = SCREENS.map(s => {
+          const isActive = state.activeScreen === s.id;
+          return `<button type="button" data-nav="${s.id}" class="tap-target px-3 py-2 rounded-xl text-xs font-semibold text-center transition ${
+            isActive ? 'bg-[#D4A017] text-[#111827]' : 'bg-[#111827] text-gray-200 border border-gray-700'
+          }">${t(s.labelKey)}</button>`;
+        }).join('');
+      }
+
+      // --- SCREEN 1: HOME ---
+      function renderHome() {
+        const summary = getGlobalWaitSummary();
+        const waitText = summary.count === 0
+          ? t('noWaitWalkIn')
+          : `${summary.count} ${summary.count === 1 ? t('personWaiting') : t('peopleWaiting')} · ${t('aboutMin', { m: summary.estMinutes })}`;
+
+        const barberChips = state.barbers.map(b => {
+          let statusText = t('statusFree');
+          let dotClass = 'bg-emerald-400';
+          if (!b.onDuty) {
+            statusText = t('statusOffDuty');
+            dotClass = 'bg-gray-500';
+          } else if (b.onBreak) {
+            statusText = t('statusOnBreak');
+            dotClass = 'bg-amber-400';
+          } else if (b.currentTokenId) {
+            statusText = t('statusBusy');
+            dotClass = 'bg-rose-400';
+          }
+          return `
+            <div class="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#111827] border border-gray-700">
+              <span class="w-2.5 h-2.5 rounded-full ${dotClass}"></span>
+              <span class="font-semibold text-sm text-white">${getBarberName(b)}</span>
+              <span class="text-xs text-gray-400">(${statusText})</span>
+            </div>
+          `;
+        }).join('');
+
+        const joinBtnHtml = state.onlineQueueOpen
+          ? `<button type="button" id="homeJoinBtn" class="w-full tap-target py-4 px-6 rounded-2xl bg-[#D4A017] hover:bg-[#E5B128] text-[#111827] font-extrabold text-lg shadow-lg shadow-[#D4A017]/20 transition transform active:scale-[0.99]">
+               ${t('joinQueueBtn')} →
+             </button>`
+          : `<div class="space-y-3">
+               <button type="button" disabled class="w-full tap-target py-4 px-6 rounded-2xl bg-gray-700 text-gray-400 font-bold text-lg cursor-not-allowed">
+                 ${t('joinQueueBtn')}
+               </button>
+               <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm text-center">
+                 ${t('onlineClosedMsg')}
+               </div>
+             </div>`;
+
+        return `
+          <div class="max-w-lg mx-auto space-y-6">
+            <!-- Hero Card -->
+            <div class="bg-[#1F2937] border border-gray-700/80 rounded-3xl p-6 sm:p-8 shadow-xl text-center space-y-5">
+              <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold ${
+                state.onlineQueueOpen
+                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                  : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+              }">
+                <span class="w-2 h-2 rounded-full ${state.onlineQueueOpen ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}"></span>
+                ${state.onlineQueueOpen ? t('openBadge') : t('closedBadge')}
+              </div>
+
+              <div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">${t('salonName')}</h1>
+                <p class="text-sm text-gray-400 mt-1">${t('salonSubtitle')}</p>
+              </div>
+
+              <!-- Live Wait Card -->
+              <div class="bg-[#111827] border border-[#D4A017]/40 rounded-2xl p-5 space-y-1">
+                <div class="text-xs uppercase tracking-wider text-[#D4A017] font-bold">${t('estWaitLabel')}</div>
+                <div class="text-xl sm:text-2xl font-bold text-white">${waitText}</div>
+              </div>
+
+              <!-- Barber Chips -->
+              <div class="space-y-2.5">
+                <div class="text-xs uppercase tracking-wider text-gray-400 font-semibold">${t('barbersLabel')}</div>
+                <div class="flex flex-wrap justify-center gap-2">
+                  ${barberChips}
+                </div>
+              </div>
+
+              <!-- Primary CTA -->
+              <div class="pt-2">
+                ${joinBtnHtml}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // --- SCREEN 2: JOIN QUEUE ---
+      function renderJoin() {
+        const enabledServices = state.services.filter(s => s.enabled);
+        let selectedMins = 0;
+        let selectedPrice = 0;
+        joinForm.services.forEach(sid => {
+          const s = getServiceById(sid);
+          if (s && s.enabled) {
+            selectedMins += s.minutes;
+            selectedPrice += s.price;
+          }
+        });
+        const estWait = getGlobalWaitSummary().estMinutes;
+        const selectedBarber = joinForm.preferredBarber !== 'any' ? getBarberById(joinForm.preferredBarber) : null;
+
+        const serviceCards = enabledServices.map(s => {
+          const isSelected = joinForm.services.includes(s.id);
+          return `
+            <button type="button" data-service-id="${s.id}" class="tap-target text-left p-3.5 rounded-2xl border transition flex items-center justify-between gap-3 ${
+              isSelected
+                ? 'bg-[#D4A017]/15 border-[#D4A017] text-white'
+                : 'bg-[#111827] border-gray-700 text-gray-300 hover:border-gray-500'
+            }">
+              <div>
+                <div class="font-semibold text-sm sm:text-base">${getServiceName(s)}</div>
+                <div class="text-xs text-gray-400">${s.minutes} ${t('minLabel')}</div>
+              </div>
+              <div class="flex items-center gap-2.5">
+                <span class="font-bold text-[#D4A017]">₹${s.price}</span>
+                <span class="w-5 h-5 rounded-md border flex items-center justify-center text-xs ${
+                  isSelected ? 'bg-[#D4A017] border-[#D4A017] text-[#111827] font-bold' : 'border-gray-600'
+                }">${isSelected ? '✓' : ''}</span>
+              </div>
+            </button>
+          `;
+        }).join('');
+
+        const barberOptions = [
+          `
+            <button type="button" data-pick-barber="any" class="tap-target p-3.5 rounded-2xl border text-left transition ${
+              joinForm.preferredBarber === 'any'
+                ? 'bg-[#D4A017]/15 border-[#D4A017] text-white'
+                : 'bg-[#111827] border-gray-700 text-gray-300 hover:border-gray-500'
+            }">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-[#D4A017]/20 text-[#D4A017] flex items-center justify-center font-bold text-sm">⚡</div>
+                <div>
+                  <div class="font-semibold text-sm">${t('anyBarber')}</div>
+                  <div class="text-xs text-gray-400">${t('anyBarberSub')}</div>
+                </div>
+              </div>
+            </button>
+          `,
+          ...state.barbers.filter(b => b.onDuty).map(b => {
+            const isSelected = joinForm.preferredBarber === b.id;
+            const statusLabel = b.onBreak ? t('statusOnBreak') : (b.currentTokenId ? t('statusBusy') : t('statusFree'));
+            const statusColor = b.onBreak ? 'text-amber-400' : (b.currentTokenId ? 'text-rose-400' : 'text-emerald-400');
+            return `
+              <button type="button" data-pick-barber="${b.id}" class="tap-target p-3.5 rounded-2xl border text-left transition ${
+                isSelected
+                  ? 'bg-[#D4A017]/15 border-[#D4A017] text-white'
+                  : 'bg-[#111827] border-gray-700 text-gray-300 hover:border-gray-500'
+              }">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-gray-700 text-white flex items-center justify-center font-bold text-sm border border-gray-600">
+                    ${b.name.charAt(0)}
+                  </div>
+                  <div>
+                    <div class="font-semibold text-sm">${getBarberName(b)}</div>
+                    <div class="text-xs ${statusColor} font-medium">${statusLabel}</div>
+                  </div>
+                </div>
+              </button>
+            `;
+          })
+        ].join('');
+
+        return `
+          <div class="max-w-xl mx-auto">
+            <div class="bg-[#1F2937] border border-gray-700/80 rounded-3xl p-5 sm:p-7 shadow-xl space-y-6">
+              <div>
+                <h1 class="text-xl sm:text-2xl font-extrabold text-white">${t('joinTitle')}</h1>
+                <p class="text-sm text-gray-400 mt-1">${t('joinSub')}</p>
+              </div>
+
+              ${!state.onlineQueueOpen ? `
+                <div class="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-sm font-medium">
+                  ${t('onlineClosedMsg')}
+                </div>
+              ` : ''}
+
+              <form id="joinQueueForm" class="space-y-5" novalidate>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-300 mb-1.5">${t('fullName')}</label>
+                    <input id="joinNameInput" type="text" value="${escapeHtml(joinForm.name)}" placeholder="${t('fullNamePlaceholder')}"
+                      class="w-full tap-target px-3.5 py-2.5 rounded-xl bg-[#111827] border ${joinForm.errors.name ? 'border-rose-500' : 'border-gray-700'} text-white text-sm focus:outline-none focus:border-[#D4A017]" />
+                    ${joinForm.errors.name ? `<p class="text-xs text-rose-400 mt-1">${joinForm.errors.name}</p>` : ''}
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-300 mb-1.5">${t('phoneLabel')}</label>
+                    <input id="joinPhoneInput" type="tel" maxlength="10" value="${escapeHtml(joinForm.phone)}" placeholder="${t('phonePlaceholder')}"
+                      class="w-full tap-target px-3.5 py-2.5 rounded-xl bg-[#111827] border ${joinForm.errors.phone ? 'border-rose-500' : 'border-gray-700'} text-white text-sm focus:outline-none focus:border-[#D4A017]" />
+                    ${joinForm.errors.phone ? `<p class="text-xs text-rose-400 mt-1">${joinForm.errors.phone}</p>` : ''}
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <label class="text-xs font-semibold text-gray-300">${t('selectServices')}</label>
+                    <span class="text-xs text-[#D4A017] font-semibold">${joinForm.services.length}/3</span>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    ${serviceCards}
+                  </div>
+                  ${joinForm.errors.services ? `<p class="text-xs text-rose-400 mt-1">${joinForm.errors.services}</p>` : ''}
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-gray-300 mb-2">${t('pickBarber')}</label>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    ${barberOptions}
+                  </div>
+                  ${selectedBarber && selectedBarber.onBreak ? `
+                    <div class="mt-2.5 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
+                      ⚠ ${t('barberOnBreakWarn', { name: getBarberName(selectedBarber) })}
+                    </div>
+                  ` : ''}
+                </div>
+
+                <!-- Live Summary Bar -->
+                <div class="bg-[#111827] border border-[#D4A017]/50 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div class="text-sm font-bold text-white">${t('summaryTotal', { min: selectedMins, price: selectedPrice })}</div>
+                    <div class="text-xs text-[#D4A017] font-medium">${t('summaryWait', { wait: estWait })}</div>
+                  </div>
+                  <button type="submit" ${!state.onlineQueueOpen ? 'disabled' : ''} class="tap-target px-6 py-3 rounded-xl font-bold text-sm transition ${
+                    state.onlineQueueOpen
+                      ? 'bg-[#D4A017] hover:bg-[#E5B128] text-[#111827] shadow-lg'
+                      : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                  }">
+                    ${t('confirmJoinBtn')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        `;
+      }
+
+      // --- SCREEN 3: MY STATUS ---
+      function renderStatus() {
+        const activeTokens = state.queue.filter(q => q.status === 'Waiting' || q.status === 'Called' || q.status === 'In chair');
+        let entry = state.queue.find(q => q.id === state.selectedStatusTokenId);
+        if (!entry && activeTokens.length > 0) {
+          entry = activeTokens[activeTokens.length - 1];
+          state.selectedStatusTokenId = entry.id;
+        }
+
+        const tokenSwitcher = activeTokens.length > 0 ? `
+          <div class="flex items-center justify-between gap-2 bg-[#1F2937] border border-gray-700 rounded-2xl px-4 py-2.5">
+            <span class="text-xs font-semibold text-gray-400">${t('selectActiveToken')}</span>
+            <select id="statusTokenSelect" class="bg-[#111827] border border-gray-600 text-white text-xs sm:text-sm font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#D4A017]">
+              ${activeTokens.map(tk => `<option value="${tk.id}" ${entry && tk.id === entry.id ? 'selected' : ''}>${tk.id} — ${escapeHtml(tk.name)} (${t('status' + tk.status.replace(/\s+/g, '').replace('-', '')) || tk.status})</option>`).join('')}
+            </select>
+          </div>
+        ` : '';
+
+        if (!entry) {
+          return `
+            <div class="max-w-md mx-auto space-y-4">
+              <div class="bg-[#1F2937] border border-gray-700 rounded-3xl p-8 text-center space-y-4">
+                <div class="text-4xl">💈</div>
+                <h2 class="text-xl font-bold text-white">${t('noActiveTokenTitle')}</h2>
+                <p class="text-sm text-gray-400">${t('noActiveTokenDesc')}</p>
+                <button type="button" data-nav="join" class="tap-target px-6 py-3 rounded-xl bg-[#D4A017] text-[#111827] font-bold text-sm">
+                  ${t('joinQueueBtn')}
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        const svcNames = entry.services.map(sid => getServiceName(getServiceById(sid))).filter(Boolean).join(' + ');
+        const prefBarberObj = entry.preferredBarber === 'any' ? null : getBarberById(entry.preferredBarber);
+        const prefBarberText = prefBarberObj ? getBarberName(prefBarberObj) : t('anyBarber');
+        const assignedBarberObj = entry.assignedBarber ? getBarberById(entry.assignedBarber) : null;
+
+        // Called -> Full-screen celebratory gold card
+        if (entry.status === 'Called') {
+          return `
+            <div class="max-w-md mx-auto space-y-4">
+              ${tokenSwitcher}
+              <div class="animate-gold-pulse bg-gradient-to-br from-[#D4A017] to-[#B4830E] text-[#111827] rounded-3xl p-8 text-center space-y-5 shadow-2xl">
+                <div class="inline-block px-4 py-1 rounded-full bg-[#111827]/15 font-extrabold text-sm tracking-widest uppercase">
+                  ${entry.id}
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-extrabold leading-tight">
+                  ${t('yourTurnTitle', { barber: assignedBarberObj ? getBarberName(assignedBarberObj) : '' })}
+                </h1>
+                <p class="text-sm font-semibold text-[#111827]/80">${t('yourTurnSub')}</p>
+                <div class="bg-[#111827]/10 rounded-2xl p-4 text-sm font-semibold">
+                  <div>${escapeHtml(entry.name)}</div>
+                  <div class="text-xs opacity-80 mt-0.5">${svcNames}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // In chair
+        if (entry.status === 'In chair') {
+          return `
+            <div class="max-w-md mx-auto space-y-4">
+              ${tokenSwitcher}
+              <div class="bg-[#1F2937] border-2 border-emerald-500/60 rounded-3xl p-7 text-center space-y-4 shadow-xl">
+                <div class="inline-block px-4 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-sm">
+                  ${entry.id} · ${t('statusInChair')}
+                </div>
+                <h2 class="text-2xl font-extrabold text-white">
+                  ${t('inChairTitle', { barber: assignedBarberObj ? getBarberName(assignedBarberObj) : '' })}
+                </h2>
+                <p class="text-sm text-gray-400">${t('inChairSub')}</p>
+                <div class="bg-[#111827] rounded-2xl p-4 text-sm text-gray-200">
+                  ${svcNames}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // Done / Cancelled / No-show
+        if (entry.status !== 'Waiting') {
+          return `
+            <div class="max-w-md mx-auto space-y-4">
+              ${tokenSwitcher}
+              <div class="bg-[#1F2937] border border-gray-700 rounded-3xl p-7 text-center space-y-4">
+                <h2 class="text-xl font-bold text-white">${t('tokenEndedTitle', { token: entry.id, status: entry.status })}</h2>
+                <p class="text-sm text-gray-400">${t('tokenEndedDesc')}</p>
+                <button type="button" data-nav="join" class="tap-target px-6 py-3 rounded-xl bg-[#D4A017] text-[#111827] font-bold text-sm">
+                  ${t('rejoinBtn')}
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        // Waiting state
+        const waitingList = getWaitingQueue();
+        const idx = waitingList.findIndex(q => q.id === entry.id);
+        const position = idx + 1;
+        const estWait = getEstimatedWaitForPosition(idx);
+        const progressPct = Math.max(12, Math.min(95, 100 - position * 12));
+        const radius = 54;
+        const circumference = 2 * Math.PI * radius;
+        const dashOffset = circumference - (progressPct / 100) * circumference;
+
+        const isBarberOnBreak = prefBarberObj && prefBarberObj.onBreak;
+
+        return `
+          <div class="max-w-md mx-auto space-y-4">
+            ${tokenSwitcher}
+
+            ${position === 2 ? `
+              <div class="p-4 rounded-2xl bg-[#D4A017]/20 border border-[#D4A017] text-[#FDE047] font-bold text-sm text-center animate-pulse">
+                🚶 ${t('startComingBanner')}
+              </div>
+            ` : ''}
+
+            ${isBarberOnBreak ? `
+              <div class="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-semibold text-center">
+                ⚠ ${t('barberOnBreakWarn', { name: getBarberName(prefBarberObj) })}
+              </div>
+            ` : ''}
+
+            <div class="bg-[#1F2937] border border-gray-700/80 rounded-3xl p-6 sm:p-7 text-center space-y-6 shadow-xl">
+              <div>
+                <div class="text-xs uppercase tracking-widest text-gray-400 font-semibold">${escapeHtml(entry.name)}</div>
+                <div class="text-5xl font-black text-[#D4A017] tracking-tight mt-1">${entry.id}</div>
+                <div class="inline-block mt-2 px-3.5 py-1 rounded-full bg-[#111827] border border-gray-700 text-sm font-bold text-white">
+                  ${t('positionInLine', { pos: getOrdinal(position) })}
+                </div>
+              </div>
+
+              <!-- Circular Countdown Ring -->
+              <div class="relative w-36 h-36 mx-auto flex items-center justify-center">
+                <svg class="w-36 h-36 -rotate-90" viewBox="0 0 128 128">
+                  <circle cx="64" cy="64" r="${radius}" stroke="#111827" stroke-width="10" fill="none" />
+                  <circle cx="64" cy="64" r="${radius}" stroke="#D4A017" stroke-width="10" fill="none"
+                    stroke-linecap="round"
+                    stroke-dasharray="${circumference}"
+                    stroke-dashoffset="${dashOffset}" />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span class="text-2xl font-extrabold text-white">~${estWait}</span>
+                  <span class="text-xs text-gray-400 font-medium">${t('minLabel')}</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3 text-left bg-[#111827] rounded-2xl p-4 border border-gray-700/70">
+                <div>
+                  <div class="text-[11px] text-gray-400 uppercase font-semibold">${t('servicesChosen')}</div>
+                  <div class="text-xs sm:text-sm font-semibold text-white mt-0.5">${svcNames}</div>
+                </div>
+                <div>
+                  <div class="text-[11px] text-gray-400 uppercase font-semibold">${t('preferredBarber')}</div>
+                  <div class="text-xs sm:text-sm font-semibold text-[#D4A017] mt-0.5">${prefBarberText}</div>
+                </div>
+              </div>
+
+              <button type="button" id="cancelSpotBtn" data-token="${entry.id}" class="w-full tap-target py-3 px-4 rounded-xl border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 font-semibold text-sm transition">
+                ${t('cancelSpotBtn')}
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      // --- SCREEN 4: RECEPTION DASHBOARD ---
+      function renderReception() {
+        const waiting = getWaitingQueue();
+        const calledEntries = state.queue.filter(q => q.status === 'Called');
+        const noShowEntries = state.queue.filter(q => q.status === 'No-show' && !q.readded);
+
+        const barberCards = state.barbers.map(b => {
+          const cur = b.currentTokenId ? state.queue.find(q => q.id === b.currentTokenId) : null;
+          const nextEligible = getNextForBarber(b.id);
+          let progressHtml = '';
+          if (cur) {
+            const totalMin = getEntryTotals(cur).minutes || 30;
+            const elapsed = b.chairStartedAt ? Math.floor((Date.now() - b.chairStartedAt) / 60000) : 0;
+            const left = totalMin - elapsed;
+            const pct = cur.status === 'Called' ? 10 : Math.min(100, Math.max(8, Math.round((elapsed / totalMin) * 100)));
+            const timeLabel = left >= 0 ? t('timeLeftLabel', { m: left }) : t('overtimeLabel', { m: Math.abs(left) });
+            progressHtml = `
+              <div class="mt-3 p-3 rounded-xl bg-[#111827] border border-gray-700 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-[#D4A017] text-sm">${cur.id} · ${escapeHtml(cur.name)}</span>
+                  <span class="text-[11px] px-2 py-0.5 rounded-full ${cur.status === 'Called' ? 'bg-[#D4A017]/20 text-[#D4A017]' : 'bg-emerald-500/20 text-emerald-300'} font-semibold">${cur.status}</span>
+                </div>
+                <div class="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
+                  <div class="h-full ${left < 0 ? 'bg-amber-400' : 'bg-[#D4A017]'} transition-all" style="width:${pct}%"></div>
+                </div>
+                <div class="flex justify-between text-[11px] text-gray-400">
+                  <span>${cur.services.map(id => getServiceName(getServiceById(id))).join(', ')}</span>
+                  <span>${cur.status === 'In chair' ? timeLabel : t('statusCalled')}</span>
+                </div>
+              </div>
+            `;
+          } else {
+            progressHtml = `
+              <div class="mt-3 p-3 rounded-xl bg-[#111827]/60 border border-dashed border-gray-700 text-xs text-gray-400 text-center">
+                ${b.onBreak ? t('statusOnBreak') : (!b.onDuty ? t('statusOffDuty') : t('noCurrentCustomer'))}
+              </div>
+            `;
+          }
+
+          const canCall = b.onDuty && !b.onBreak && !b.currentTokenId && Boolean(nextEligible);
+          return `
+            <div class="bg-[#1F2937] border border-gray-700/80 rounded-2xl p-4 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-full bg-[#D4A017]/20 text-[#D4A017] flex items-center justify-center font-bold">${b.name.charAt(0)}</div>
+                    <div>
+                      <div class="font-bold text-white">${getBarberName(b)}</div>
+                      <div class="text-xs ${b.onBreak ? 'text-amber-400' : (!b.onDuty ? 'text-gray-500' : (cur ? 'text-rose-400' : 'text-emerald-400'))}">
+                        ${!b.onDuty ? t('statusOffDuty') : (b.onBreak ? t('statusOnBreak') : (cur ? t('statusBusy') : t('statusFree')))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                ${progressHtml}
+              </div>
+              <div class="mt-3 pt-3 border-t border-gray-700/60">
+                <button type="button" data-call-next="${b.id}" ${!canCall ? 'disabled' : ''} class="w-full tap-target py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition ${
+                  canCall
+                    ? 'bg-[#D4A017] hover:bg-[#E5B128] text-[#111827]'
+                    : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                }">
+                  ${t('callNextBtn')} ${nextEligible ? `(${nextEligible.id})` : ''}
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        const waitingRows = waiting.length === 0
+          ? `<div class="p-8 text-center text-gray-400 text-sm">${t('noWaitWalkIn')}</div>`
+          : waiting.map(item => {
+              const waitedMins = Math.max(0, Math.floor((Date.now() - item.createdAt) / 60000));
+              const isLongWait = waitedMins > 60;
+              const prefObj = item.preferredBarber === 'any' ? null : getBarberById(item.preferredBarber);
+              const prefLabel = prefObj ? getBarberName(prefObj) : t('anyBarber');
+              const svcText = item.services.map(id => getServiceName(getServiceById(id))).join(', ');
+
+              return `
+                <div class="p-3.5 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  isLongWait ? 'bg-amber-500/10 border-amber-500/50' : 'bg-[#111827] border-gray-700/80'
+                }">
+                  <div class="space-y-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="px-2.5 py-0.5 rounded-lg bg-[#D4A017]/20 text-[#D4A017] font-extrabold text-xs">${item.id}</span>
+                      <span class="font-bold text-white text-sm">${escapeHtml(item.name)}</span>
+                      ${item.isWalkIn ? `<span class="px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-300 text-[10px] font-semibold">${t('walkInBadge')}</span>` : ''}
+                      ${isLongWait ? `<span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-bold">${t('longWaitBadge')}</span>` : ''}
+                    </div>
+                    <div class="text-xs text-gray-400">
+                      ${svcText} · <span class="text-gray-300 font-medium">${prefLabel}</span> · <span>${t('waitedLabel', { m: waitedMins })}</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" data-cancel-token="${item.id}" class="tap-target px-3 py-1.5 rounded-xl border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 text-xs font-semibold">
+                      ${t('cancelBtn')}
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('');
+
+        const calledRows = calledEntries.map(item => {
+          const b = getBarberById(item.assignedBarber);
+          return `
+            <div class="p-3 rounded-xl bg-[#D4A017]/10 border border-[#D4A017]/40 flex items-center justify-between gap-2">
+              <div>
+                <span class="font-extrabold text-[#D4A017] text-xs mr-2">${item.id}</span>
+                <span class="font-semibold text-white text-sm">${escapeHtml(item.name)}</span>
+                <span class="text-xs text-gray-300 ml-1.5">→ ${b ? getBarberName(b) : ''}</span>
+              </div>
+              <button type="button" data-noshow-token="${item.id}" class="tap-target px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/50 text-amber-200 hover:bg-amber-500/30 text-xs font-bold">
+                ${t('markNoShowBtn')}
+              </button>
+            </div>
+          `;
+        }).join('');
+
+        const noShowRows = noShowEntries.map(item => `
+          <div class="p-3 rounded-xl bg-[#111827] border border-gray-700 flex items-center justify-between gap-2">
+            <div class="text-xs sm:text-sm">
+              <span class="text-gray-400 font-bold mr-2">${item.id}</span>
+              <span class="text-gray-200 font-semibold">${escapeHtml(item.name)}</span>
+            </div>
+            <button type="button" data-readd-token="${item.id}" class="tap-target px-3 py-1.5 rounded-lg bg-[#D4A017] text-[#111827] text-xs font-bold">
+              ${t('readdEndBtn')}
+            </button>
+          </div>
+        `).join('');
+
+        return `
+          <div class="space-y-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <h1 class="text-xl sm:text-2xl font-extrabold text-white">${t('receptionTitle')}</h1>
+              <div class="flex items-center gap-2">
+                <button type="button" id="resetDemoBtn" class="tap-target px-3.5 py-2 rounded-xl bg-[#1F2937] border border-gray-600 text-gray-300 hover:text-white text-xs font-semibold">
+                  ${t('resetDemoBtn')}
+                </button>
+                <button type="button" id="openWalkInBtn" class="tap-target px-4 py-2 rounded-xl bg-[#D4A017] hover:bg-[#E5B128] text-[#111827] font-bold text-sm shadow">
+                  ${t('addWalkInBtn')}
+                </button>
+              </div>
+            </div>
+
+            <!-- 3-Column Barber Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              ${barberCards}
+            </div>
+
+            <!-- Waiting List + Called / No-Shows -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <div class="lg:col-span-2 bg-[#1F2937] border border-gray-700/80 rounded-3xl p-4 sm:p-5 space-y-3">
+                <div class="flex items-center justify-between">
+                  <h2 class="font-bold text-base text-white">${t('waitingListTitle')} (${waiting.length})</h2>
+                </div>
+                <div class="space-y-2.5">
+                  ${waitingRows}
+                </div>
+              </div>
+
+              <div class="space-y-4">
+                <div class="bg-[#1F2937] border border-gray-700/80 rounded-3xl p-4 space-y-3">
+                  <h3 class="font-bold text-sm text-[#D4A017] uppercase tracking-wider">${t('statusCalled')} (${calledEntries.length})</h3>
+                  ${calledEntries.length ? `<div class="space-y-2">${calledRows}</div>` : `<div class="text-xs text-gray-400">—</div>`}
+                </div>
+
+                <div class="bg-[#1F2937] border border-gray-700/80 rounded-3xl p-4 space-y-3">
+                  <h3 class="font-bold text-sm text-gray-300 uppercase tracking-wider">${t('noShowSectionTitle')}</h3>
+                  ${noShowEntries.length ? `<div class="space-y-2">${noShowRows}</div>` : `<div class="text-xs text-gray-400">—</div>`}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // --- SCREEN 5: BARBER VIEW ---
+      function renderBarber() {
+        const barber = getBarberById(state.selectedBarberId) || state.barbers[0];
+        const cur = barber.currentTokenId ? state.queue.find(q => q.id === barber.currentTokenId) : null;
+        const nextForYou = getNextForBarber(barber.id);
+
+        const barberTabs = state.barbers.map(b => `
+          <button type="button" data-select-barber="${b.id}" class="tap-target px-4 py-2 rounded-xl text-sm font-bold transition ${
+            b.id === barber.id ? 'bg-[#D4A017] text-[#111827]' : 'bg-[#1F2937] text-gray-300 border border-gray-700'
+          }">
+            ${getBarberName(b)}
+          </button>
+        `).join('');
+
+        let currentCard = '';
+        if (cur) {
+          const svcList = cur.services.map(id => getServiceName(getServiceById(id))).join(' + ');
+          const elapsedMins = cur.startedAt ? Math.max(0, Math.floor((Date.now() - cur.startedAt) / 60000)) : 0;
+          const isCalled = cur.status === 'Called';
+
+          currentCard = `
+            <div class="bg-[#1F2937] border ${isCalled ? 'border-[#D4A017]' : 'border-emerald-500/60'} rounded-3xl p-6 space-y-5 shadow-xl">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wider text-gray-400 font-semibold">${t('currentCustomer')}</span>
+                <span class="px-3 py-1 rounded-full text-xs font-bold ${isCalled ? 'bg-[#D4A017]/20 text-[#D4A017]' : 'bg-emerald-500/20 text-emerald-300'}">
+                  ${isCalled ? t('statusCalled') : t('statusInChair')}
+                </span>
+              </div>
+
+              <div>
+                <div class="text-3xl font-black text-[#D4A017]">${cur.id}</div>
+                <div class="text-xl font-bold text-white mt-1">${escapeHtml(cur.name)}</div>
+                <div class="text-sm text-gray-300 mt-1">${svcList}</div>
+              </div>
+
+              ${!isCalled ? `
+                <div class="bg-[#111827] rounded-2xl p-4 flex items-center justify-between border border-gray-700">
+                  <span class="text-xs text-gray-400 font-semibold">${t('timerSinceStart')}</span>
+                  <span class="text-xl font-extrabold text-white">${elapsedMins} ${t('minLabel')}</span>
+                </div>
+              ` : ''}
+
+              <div>
+                ${isCalled ? `
+                  <button type="button" data-barber-start="${barber.id}" class="w-full tap-target py-4 rounded-2xl bg-[#D4A017] hover:bg-[#E5B128] text-[#111827] font-extrabold text-lg shadow-lg">
+                    ▶ ${t('startServiceBtn')}
+                  </button>
+                ` : `
+                  <button type="button" data-barber-done="${barber.id}" class="w-full tap-target py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-[#111827] font-extrabold text-lg shadow-lg">
+                    ✓ ${t('doneServiceBtn')}
+                  </button>
+                `}
+              </div>
+            </div>
+          `;
+        } else {
+          currentCard = `
+            <div class="bg-[#1F2937] border border-gray-700 rounded-3xl p-8 text-center space-y-3">
+              <div class="text-3xl">💺</div>
+              <div class="text-lg font-bold text-white">${t('noCurrentCustomer')}</div>
+              <p class="text-xs text-gray-400">${t('tapCallNextHint')}</p>
+            </div>
+          `;
+        }
+
+        const nextText = nextForYou
+          ? `${nextForYou.id} ${escapeHtml(nextForYou.name)} (${nextForYou.services.map(id => getServiceName(getServiceById(id))).join(', ')})`
+          : t('noNextForYou');
+
+        return `
+          <div class="max-w-md mx-auto space-y-5">
+            <div class="flex items-center justify-between gap-2">
+              <h1 class="text-xl font-extrabold text-white">${t('barberViewTitle')}</h1>
+              <div class="flex gap-1.5">${barberTabs}</div>
+            </div>
+
+            <!-- Break Toggle -->
+            <div class="bg-[#1F2937] border border-gray-700 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <div class="text-xs text-gray-400 font-semibold">${t('breakToggleLabel')}</div>
+                <div class="font-bold text-sm ${barber.onBreak ? 'text-amber-400' : 'text-emerald-400'}">
+                  ${barber.onBreak ? t('onBreakState') : t('availableState')}
+                </div>
+              </div>
+              <button type="button" data-toggle-break="${barber.id}" class="tap-target px-4 py-2 rounded-xl font-bold text-xs transition ${
+                barber.onBreak
+                  ? 'bg-emerald-500/20 border border-emerald-500 text-emerald-300'
+                  : 'bg-amber-500/20 border border-amber-500 text-amber-300'
+              }">
+                ${barber.onBreak ? t('availableState') : t('onBreakState')}
+              </button>
+            </div>
+
+            ${currentCard}
+
+            <div class="bg-[#1F2937] border border-gray-700 rounded-2xl p-4">
+              <div class="text-xs text-[#D4A017] font-bold uppercase tracking-wider mb-1">${t('nextForYou')}</div>
+              <div class="text-sm font-semibold text-white">${nextText}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      // --- SCREEN 6: WAITING AREA TV ---
+      function renderDisplay() {
+        const waiting5 = getWaitingQueue().slice(0, 5);
+        const isRecentFlash = state.lastCalledFlash && (Date.now() - state.lastCalledFlash.at < 8000);
+
+        const barberRows = state.barbers.filter(b => b.onDuty).map(b => {
+          const cur = b.currentTokenId ? state.queue.find(q => q.id === b.currentTokenId) : null;
+          const flashThis = isRecentFlash && state.lastCalledFlash.barberId === b.id && cur && cur.id === state.lastCalledFlash.token;
+
+          return `
+            <div class="p-5 sm:p-6 rounded-3xl border-2 flex items-center justify-between gap-4 transition ${
+              flashThis ? 'animate-tv-flash' : 'bg-[#1F2937] border-gray-700'
+            }">
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#D4A017]/20 border border-[#D4A017]/40 text-[#D4A017] flex items-center justify-center font-black text-2xl">
+                  ${b.name.charAt(0)}
+                </div>
+                <div>
+                  <div class="text-xl sm:text-2xl font-extrabold text-white">${getBarberName(b)}</div>
+                  <div class="text-sm font-semibold ${b.onBreak ? 'text-amber-400' : (cur ? 'text-emerald-400' : 'text-gray-400')}">
+                    ${b.onBreak ? t('statusOnBreak') : (cur ? (cur.status === 'Called' ? t('statusCalled') : t('statusInChair')) : t('tvFreeChair'))}
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                ${cur ? `
+                  <div class="text-xs uppercase tracking-wider text-gray-400 font-bold">${t('tvNowPrefix')}</div>
+                  <div class="text-3xl sm:text-5xl font-black text-[#D4A017] tracking-tight">${cur.id}</div>
+                ` : `<div class="text-2xl font-bold text-gray-600">—</div>`}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        const upNextHtml = waiting5.length === 0
+          ? `<div class="p-8 text-center text-gray-400 text-lg">${t('noWaitWalkIn')}</div>`
+          : waiting5.map((item, idx) => {
+              const est = getEstimatedWaitForPosition(idx);
+              return `
+                <div class="p-4 sm:p-5 rounded-2xl bg-[#111827] border border-gray-700 flex items-center justify-between">
+                  <div class="flex items-center gap-4">
+                    <span class="text-2xl sm:text-3xl font-black text-[#D4A017]">${item.id}</span>
+                    <span class="text-lg sm:text-xl font-bold text-white">${escapeHtml(item.name)}</span>
+                  </div>
+                  <span class="text-base sm:text-lg font-semibold text-gray-300">~${est} ${t('minLabel')}</span>
+                </div>
+              `;
+            }).join('');
+
+        return `
+          <div class="space-y-6">
+            <div class="flex items-center justify-between">
+              <h1 class="text-2xl sm:text-3xl font-black text-white tracking-tight">📺 ${t('tvTitle')}</h1>
+              <button type="button" id="tvSoundToggleBtn" class="tap-target px-4 py-2 rounded-xl bg-[#1F2937] border border-gray-600 text-sm font-semibold text-gray-200 hover:border-[#D4A017]">
+                ${state.soundEnabled ? '🔔 ' + t('tvSoundOn') : '🔕 ' + t('tvSoundOff')}
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div class="lg:col-span-7 space-y-4">
+                <div class="text-sm uppercase tracking-widest text-[#D4A017] font-bold">${t('tvNowServing')}</div>
+                ${barberRows}
+              </div>
+
+              <div class="lg:col-span-5 bg-[#1F2937] border border-gray-700 rounded-3xl p-5 sm:p-6 space-y-4">
+                <div class="text-sm uppercase tracking-widest text-[#D4A017] font-bold">${t('tvUpNext')}</div>
+                <div class="space-y-3">
+                  ${upNextHtml}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // --- SCREEN 7: OWNER SETTINGS ---
+      function renderAdmin() {
+        const avgWait = state.stats.served > 0 ? Math.round(state.stats.totalWaitMins / state.stats.served) : 0;
+
+        const barberToggles = state.barbers.map(b => `
+          <div class="p-3.5 rounded-2xl bg-[#111827] border border-gray-700 flex items-center justify-between">
+            <div class="font-semibold text-white text-sm">${getBarberName(b)}</div>
+            <button type="button" data-admin-barber="${b.id}" class="tap-target px-4 py-1.5 rounded-xl text-xs font-bold transition ${
+              b.onDuty ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50' : 'bg-gray-800 text-gray-400 border border-gray-700'
+            }">
+              ${b.onDuty ? t('serviceActive') : t('statusOffDuty')}
+            </button>
+          </div>
+        `).join('');
+
+        const serviceToggles = state.services.map(s => `
+          <div class="p-3.5 rounded-2xl bg-[#111827] border border-gray-700 flex items-center justify-between gap-3">
+            <div>
+              <div class="font-semibold text-white text-sm">${s.nameEn} <span class="text-gray-400">/ ${s.nameGu}</span></div>
+              <div class="text-xs text-gray-400">${s.minutes} ${t('minLabel')} · ₹${s.price}</div>
+            </div>
+            <button type="button" data-admin-service="${s.id}" class="tap-target px-4 py-1.5 rounded-xl text-xs font-bold transition ${
+              s.enabled ? 'bg-[#D4A017] text-[#111827]' : 'bg-gray-800 text-gray-400 border border-gray-700'
+            }">
+              ${s.enabled ? t('serviceActive') : t('serviceHidden')}
+            </button>
+          </div>
+        `).join('');
+
+        return `
+          <div class="max-w-4xl mx-auto space-y-6">
+            <h1 class="text-xl sm:text-2xl font-extrabold text-white">${t('adminTitle')}</h1>
+
+            <!-- Today's Stats -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="bg-[#1F2937] border border-gray-700 rounded-2xl p-5">
+                <div class="text-xs text-gray-400 font-semibold uppercase">${t('statsServed')}</div>
+                <div class="text-3xl font-black text-[#D4A017] mt-1">${state.stats.served}</div>
+              </div>
+              <div class="bg-[#1F2937] border border-gray-700 rounded-2xl p-5">
+                <div class="text-xs text-gray-400 font-semibold uppercase">${t('statsAvgWait')}</div>
+                <div class="text-3xl font-black text-white mt-1">${avgWait} <span class="text-sm font-semibold text-gray-400">${t('minLabel')}</span></div>
+              </div>
+              <div class="bg-[#1F2937] border border-gray-700 rounded-2xl p-5">
+                <div class="text-xs text-gray-400 font-semibold uppercase">${t('statsNoShows')}</div>
+                <div class="text-3xl font-black text-amber-400 mt-1">${state.stats.noShows}</div>
+              </div>
+            </div>
+
+            <!-- Online Queue Switch -->
+            <div class="bg-[#1F2937] border border-gray-700 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 class="font-bold text-base text-white">${t('onlineQueueControl')}</h2>
+                <p class="text-xs text-gray-400 mt-0.5">${t('onlineQueueDesc')}</p>
+              </div>
+              <button type="button" id="adminQueueToggleBtn" class="tap-target px-6 py-2.5 rounded-xl font-extrabold text-sm shrink-0 transition ${
+                state.onlineQueueOpen
+                  ? 'bg-emerald-500 text-[#111827]'
+                  : 'bg-rose-500 text-white'
+              }">
+                ${state.onlineQueueOpen ? t('queueOpenLabel') : t('queueClosedLabel')}
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <!-- Barbers on Duty -->
+              <div class="bg-[#1F2937] border border-gray-700 rounded-3xl p-5 space-y-3">
+                <h2 class="font-bold text-base text-white">${t('barbersOnDutyTitle')}</h2>
+                <div class="space-y-2.5">${barberToggles}</div>
+              </div>
+
+              <!-- Services Menu -->
+              <div class="bg-[#1F2937] border border-gray-700 rounded-3xl p-5 space-y-3">
+                <h2 class="font-bold text-base text-white">${t('servicesMenuTitle')}</h2>
+                <div class="space-y-2.5">${serviceToggles}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // =========================================================================
+      // 7. MASTER RENDER & EVENT BINDING
+      // =========================================================================
+      function escapeHtml(str) {
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function renderAll() {
+        renderNav();
+        const main = document.getElementById('appMain');
+        switch (state.activeScreen) {
+          case 'home': main.innerHTML = renderHome(); break;
+          case 'join': main.innerHTML = renderJoin(); break;
+          case 'status': main.innerHTML = renderStatus(); break;
+          case 'reception': main.innerHTML = renderReception(); break;
+          case 'barber': main.innerHTML = renderBarber(); break;
+          case 'display': main.innerHTML = renderDisplay(); break;
+          case 'admin': main.innerHTML = renderAdmin(); break;
+          default: main.innerHTML = renderHome();
+        }
+        bindDynamicEvents();
+      }
+
+      function bindDynamicEvents() {
+        // Nav buttons inside main (e.g. "Join Queue" in empty status)
+        document.querySelectorAll('[data-nav]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            state.activeScreen = btn.getAttribute('data-nav');
+            document.getElementById('mobileNavDrawer').classList.add('hidden');
+            saveState(false);
+            renderAll();
+          });
+        });
+
+        // Home Join CTA
+        const homeJoinBtn = document.getElementById('homeJoinBtn');
+        if (homeJoinBtn) {
+          homeJoinBtn.addEventListener('click', () => {
+            state.activeScreen = 'join';
+            saveState(false);
+            renderAll();
+          });
+        }
+
+        // Join Queue Form
+        const joinFormEl = document.getElementById('joinQueueForm');
+        if (joinFormEl) {
+          const nameInput = document.getElementById('joinNameInput');
+          const phoneInput = document.getElementById('joinPhoneInput');
+          nameInput.addEventListener('input', e => { joinForm.name = e.target.value; });
+          phoneInput.addEventListener('input', e => {
+            joinForm.phone = e.target.value.replace(/\D/g, '').slice(0, 10);
+            e.target.value = joinForm.phone;
+          });
+
+          document.querySelectorAll('[data-service-id]').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const sid = btn.getAttribute('data-service-id');
+              const idx = joinForm.services.indexOf(sid);
+              if (idx > -1) {
+                joinForm.services.splice(idx, 1);
+              } else {
+                if (joinForm.services.length >= 3) {
+                  showToast(t('maxServicesToast'), 'amber');
+                  return;
+                }
+                joinForm.services.push(sid);
+              }
+              joinForm.errors.services = null;
+              renderAll();
+            });
+          });
+
+          document.querySelectorAll('[data-pick-barber]').forEach(btn => {
+            btn.addEventListener('click', () => {
+              joinForm.preferredBarber = btn.getAttribute('data-pick-barber');
+              renderAll();
+            });
+          });
+
+          joinFormEl.addEventListener('submit', e => {
+            e.preventDefault();
+            if (!state.onlineQueueOpen) return;
+            const errors = {};
+            if (!joinForm.name.trim()) errors.name = t('nameError');
+            if (!/^\d{10}$/.test(joinForm.phone)) errors.phone = t('phoneError');
+            if (joinForm.services.length === 0) errors.services = t('serviceError');
+            joinForm.errors = errors;
+            if (Object.keys(errors).length > 0) {
+              renderAll();
+              return;
+            }
+            const createdId = addCustomerToQueue({
+              name: joinForm.name,
+              phone: joinForm.phone,
+              services: joinForm.services,
+              preferredBarber: joinForm.preferredBarber,
+              isWalkIn: false
+            });
+            joinForm = { name: '', phone: '', services: ['haircut'], preferredBarber: 'any', errors: {} };
+            return createdId;
+          });
+        }
+
+        // My Status
+        const statusSelect = document.getElementById('statusTokenSelect');
+        if (statusSelect) {
+          statusSelect.addEventListener('change', e => {
+            state.selectedStatusTokenId = e.target.value;
+            saveState(false);
+            renderAll();
+          });
+        }
+        const cancelSpotBtn = document.getElementById('cancelSpotBtn');
+        if (cancelSpotBtn) {
+          cancelSpotBtn.addEventListener('click', () => {
+            const tokenId = cancelSpotBtn.getAttribute('data-token');
+            openModal(`
+              <div class="space-y-4">
+                <h3 class="text-lg font-bold text-white">${t('cancelConfirmTitle')}</h3>
+                <p class="text-sm text-gray-300">${t('cancelConfirmDesc', { token: tokenId })}</p>
+                <div class="flex gap-3 pt-2">
+                  <button type="button" id="modalKeepBtn" class="flex-1 tap-target py-2.5 rounded-xl bg-[#111827] border border-gray-600 text-gray-200 font-semibold text-sm">${t('keepSpotBtn')}</button>
+                  <button type="button" id="modalConfirmCancelBtn" class="flex-1 tap-target py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm">${t('confirmCancelBtn')}</button>
+                </div>
+              </div>
+            `);
+            document.getElementById('modalKeepBtn').addEventListener('click', closeModal);
+            document.getElementById('modalConfirmCancelBtn').addEventListener('click', () => {
+              closeModal();
+              cancelToken(tokenId);
+            });
+          });
+        }
+
+        // Reception
+        document.querySelectorAll('[data-call-next]').forEach(btn => {
+          btn.addEventListener('click', () => callNextForBarber(btn.getAttribute('data-call-next')));
+        });
+        document.querySelectorAll('[data-cancel-token]').forEach(btn => {
+          btn.addEventListener('click', () => cancelToken(btn.getAttribute('data-cancel-token')));
+        });
+        document.querySelectorAll('[data-noshow-token]').forEach(btn => {
+          btn.addEventListener('click', () => markNoShow(btn.getAttribute('data-noshow-token')));
+        });
+        document.querySelectorAll('[data-readd-token]').forEach(btn => {
+          btn.addEventListener('click', () => readdNoShowAtEnd(btn.getAttribute('data-readd-token')));
+        });
+        const resetDemoBtn = document.getElementById('resetDemoBtn');
+        if (resetDemoBtn) {
+          resetDemoBtn.addEventListener('click', () => {
+            const currentLang = state.lang;
+            const currentScreen = state.activeScreen;
+            state = createInitialState();
+            state.lang = currentLang;
+            state.activeScreen = currentScreen;
+            saveState();
+            showToast(t('demoResetToast'), 'info');
+            renderAll();
+          });
+        }
+        const openWalkInBtn = document.getElementById('openWalkInBtn');
+        if (openWalkInBtn) {
+          openWalkInBtn.addEventListener('click', openWalkInModal);
+        }
+
+        // Barber View
+        document.querySelectorAll('[data-select-barber]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            state.selectedBarberId = btn.getAttribute('data-select-barber');
+            saveState(false);
+            renderAll();
+          });
+        });
+        document.querySelectorAll('[data-barber-start]').forEach(btn => {
+          btn.addEventListener('click', () => startServiceForBarber(btn.getAttribute('data-barber-start')));
+        });
+        document.querySelectorAll('[data-barber-done]').forEach(btn => {
+          btn.addEventListener('click', () => doneServiceForBarber(btn.getAttribute('data-barber-done')));
+        });
+        document.querySelectorAll('[data-toggle-break]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const b = getBarberById(btn.getAttribute('data-toggle-break'));
+            if (b) {
+              b.onBreak = !b.onBreak;
+              saveState();
+              renderAll();
+            }
+          });
+        });
+
+        // TV Display
+        const tvSoundBtn = document.getElementById('tvSoundToggleBtn');
+        if (tvSoundBtn) {
+          tvSoundBtn.addEventListener('click', () => {
+            state.soundEnabled = !state.soundEnabled;
+            if (state.soundEnabled) playChime();
+            saveState();
+            renderAll();
+          });
+        }
+
+        // Owner Settings
+        const adminQueueBtn = document.getElementById('adminQueueToggleBtn');
+        if (adminQueueBtn) {
+          adminQueueBtn.addEventListener('click', () => {
+            state.onlineQueueOpen = !state.onlineQueueOpen;
+            saveState();
+            renderAll();
+          });
+        }
+        document.querySelectorAll('[data-admin-barber]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const b = getBarberById(btn.getAttribute('data-admin-barber'));
+            if (b) {
+              b.onDuty = !b.onDuty;
+              saveState();
+              renderAll();
+            }
+          });
+        });
+        document.querySelectorAll('[data-admin-service]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const s = getServiceById(btn.getAttribute('data-admin-service'));
+            if (s) {
+              s.enabled = !s.enabled;
+              saveState();
+              renderAll();
+            }
+          });
+        });
+      }
+
+      function openWalkInModal() {
+        const enabledServices = state.services.filter(s => s.enabled);
+        openModal(`
+          <form id="walkInForm" class="space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-bold text-white">${t('walkInModalTitle')}</h3>
+              <button type="button" id="closeWalkInModal" class="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-300 mb-1">${t('fullName')}</label>
+              <input id="walkInName" type="text" required placeholder="${t('fullNamePlaceholder')}" class="w-full tap-target px-3 py-2 rounded-xl bg-[#111827] border border-gray-700 text-white text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-300 mb-1">${t('phoneLabel')}</label>
+              <input id="walkInPhone" type="tel" maxlength="10" required placeholder="${t('phonePlaceholder')}" class="w-full tap-target px-3 py-2 rounded-xl bg-[#111827] border border-gray-700 text-white text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-300 mb-1">${t('selectServices')}</label>
+              <div class="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto">
+                ${enabledServices.map((s, idx) => `
+                  <label class="flex items-center gap-2 p-2 rounded-lg bg-[#111827] border border-gray-700 text-xs text-gray-200 cursor-pointer">
+                    <input type="checkbox" name="walkInSvc" value="${s.id}" ${idx === 0 ? 'checked' : ''} class="accent-[#D4A017]" />
+                    <span>${getServiceName(s)}</span>
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-300 mb-1">${t('pickBarber')}</label>
+              <select id="walkInBarber" class="w-full tap-target px-3 py-2 rounded-xl bg-[#111827] border border-gray-700 text-white text-sm">
+                <option value="any">${t('anyBarber')}</option>
+                ${state.barbers.filter(b => b.onDuty).map(b => `<option value="${b.id}">${getBarberName(b)}</option>`).join('')}
+              </select>
+            </div>
+            <button type="submit" class="w-full tap-target py-3 rounded-xl bg-[#D4A017] text-[#111827] font-bold text-sm">
+              ${t('addWalkInConfirm')}
+            </button>
+          </form>
+        `);
+        document.getElementById('closeWalkInModal').addEventListener('click', closeModal);
+        document.getElementById('walkInForm').addEventListener('submit', e => {
+          e.preventDefault();
+          const name = document.getElementById('walkInName').value.trim();
+          const phone = document.getElementById('walkInPhone').value.replace(/\D/g, '');
+          const svcs = Array.from(document.querySelectorAll('input[name="walkInSvc"]:checked')).map(el => el.value).slice(0, 3);
+          const barber = document.getElementById('walkInBarber').value;
+          if (!name || phone.length !== 10 || svcs.length === 0) {
+            showToast(t('phoneError'), 'amber');
+            return;
+          }
+          closeModal();
+          addCustomerToQueue({ name, phone, services: svcs, preferredBarber: barber, isWalkIn: true });
+        });
+      }
+
+      // Header permanent listeners
+      document.getElementById('brandHomeBtn').addEventListener('click', () => {
+        state.activeScreen = 'home';
+        saveState(false);
+        renderAll();
+      });
+      document.getElementById('langToggleBtn').addEventListener('click', () => {
+        state.lang = state.lang === 'en' ? 'gu' : 'en';
+        saveState();
+        renderAll();
+      });
+      document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+        document.getElementById('mobileNavDrawer').classList.toggle('hidden');
+      });
+
+      // Live timer tick every 15s to refresh wait times and chair timers
+      setInterval(() => {
+        if (['status', 'reception', 'barber', 'display', 'home'].includes(state.activeScreen)) {
+          renderAll();
+        }
+      }, 15000);
+
+      // Initial render
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
